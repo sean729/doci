@@ -2,14 +2,16 @@
 # Dockerfile for doci-lbal nginx
 ######################################################## 
 # Build from base image doci-base:latest for load balancer using nginx (+22 MB)
-FROM ubuntu:latest 
-# Author: Sean Peterson 
-# Version: 0.0.1
+FROM doci-base:latest 
 
-MAINTAINER Sean` Peterson <sean729@gmail.com> 
+# Author: Sean Peterson 
+# Version: 0.0.4
+
+MAINTAINER Sean Peterson <sean729@gmail.com> 
 
 RUN \
 	apt-get update && \
+	apt remove apache2 && \
 	apt-get install -y nginx
 
 COPY \
