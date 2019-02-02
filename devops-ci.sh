@@ -1,12 +1,13 @@
 #!/bin/bash
+
 # SCRIPTNAME: devops-ci.sh
 # AUTHOR:     Sean Peterson
-# MODifIED:   2019-02-01
+# MODifIED:   2019-02-02
 # COMMENT:    trigger CI and handle results
 #             upload images to docker hub
 #             deploy containers based on images
-# CHANGES:    Initial version with header
-# VERSION:    0.23
+# CHANGES:    Fixed version tag on images
+# VERSION:    0.2.4
 
 # PREREQS
 # host must have package jq
@@ -19,7 +20,7 @@ set -o errexit
 # VARIABLES
 
 nameImage="doci-app" # SAMPLE doci-app:1.0.0
-
+autoScale="3"
 docker pull sean729/$nameImage:latest 
 
 verImage=$(docker image inspect $nameImage:latest | jq .[0] | jq .RepoTags[0] | sed "s/\"//g")
@@ -66,44 +67,78 @@ echo "Next version is: ${nextVer}"
 # 1. generate doci-base image shall be commented out, not part of script CD
 
 
-# 2. start doci-builder containers CD
+# 2. start container with doci-builder image to generate new doci-app image for Ci/CD
 
 #start container for CI, call/trigger Maven script to build Spring app (docker in docker??) 
 docker run -d --name maven doci-builder:latest
 docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && git pull origin master'
 docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && mvn clean test && mvn clean package && mvn '
 
+
 # 3. run containers based on image doci-app (java 1.8, springboot) for CD
 # cd /root/images/doci-app && docker build -t doci-app .
 
-docker run -d --name sprboot1 doci-app:latest
-docker run -d --name sprboot2 doci-app:latest
-docker run -d --name sprboot3 doci-app:latest
+R=$autoScale
+R=3; while [ "$R" -ne 0 ]; do docker run -d --name sprboot$R doci-app:${nextVer}; R=$[R-1]; done
 
-# 3.1 get each IP address
-IPA1=(docker inspect sprboot1 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
-IPA2=(docker inspect sprboot2 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
-IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
+# 3.1 get IP address of each sprboot container and update load balance config file (nginx)
+
+R=$autoScale
+while [ "$R" -ne 0 ]; 
+do 
+	export "IPA$R"=$(docker container inspect "sprboot$R" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
+	R=$[R-1]; 
+done 
 
 
 # 4. update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
-sed -i "s/sprboot1/$IPA1/" ./doci-lbal/default-nginx.conf
-sed -i "s/sprboot2/$IPA2/" ./doci-lbal/default-nginx.conf
-sed -i "s/sprboot3/$IPA3/" ./doci-lbal/default-nginx.conf
+
+R=$autoScale
+while [ "$R" -ne 0 ]; 
+do
+	sed -i "s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf
+done
 
 
-# 4.1 New image doci-lbal and start container for ngnx load balancer in CD
+# 4.1 generate new doci-lbal image and upload to 
+
 cd ./doci-lbal && docker build -t doci-lbal:${nextVer} .
-docker run -d --name nginx doci-lbal:latest
+docker tag doci-lbal:${nextVer} sean729/doci-lbal:${nextVer}
+docker push sean729/doci-lbal:${nextVer}
+
+# 4.2 start container for ngnx load balancer in CD
+
+docker run -d --name nginx doci-lbal:${nextVer}
 
 
 # 5. generate doci-db image IS NOT part of script CD
 docker run -d --name mariadb doci-db:latest
 
 
-# Final state updates
+# 6. final state updates
+
+# 6.1 upload new doci-app image to Docker Hub account
+
+docker tag doci-app:${nextVer} sean729/doci-app:${nextVer}
+docker push sean729/doci-app:${nextVer}
+docker tag doci-app:latest sean729/doci-app:latest
+docker push sean729/doci-app:latest
+
+# 6.2 upload new doci-lbal image to Docker Hub account
+
+docker tag doci-lbal:${nextVer} sean729/doci-lbal:${nextVer}
+docker push sean729/doci-lbal:${nextVer}
+docker tag doci-lbal:latest sean729/doci-lbal:latest
+docker push sean729/doci-lbal:latest
+
+# 6.3 upload new doci-db image to Docker Hub account
+
+docker tag doci-db:${nextVer} sean729/doci-db:${nextVer}
+docker push sean729/doci-db:${nextVer}
+docker tag doci-db:latest sean729/doci-db:latest
+docker push sean729/doci-db:latest
+
 Ver=${nextVer}
 
 echo "Next version number in var \$Ver is: ${Ver}"
-
 
