@@ -7,7 +7,7 @@
 #             upload images to docker hub
 #             deploy containers based on images
 # CHANGES:    Fixed version tag on images
-# VERSION:    0.2.4
+# VERSION:    0.2.5
 
 # PREREQS
 # host must have package jq
@@ -27,15 +27,14 @@ verImage=$(docker image inspect $nameImage:latest | jq .[0] | jq .RepoTags[0] | 
 lenImage=${#verImage}
 curVer=${verImage:$[lenImage-5]:$lenImage}
 
-echo "Image current version tag is: ${curVer}"
-
+echo "Current production $nameImage image is: ${curVer}"
 
 Maj=${curVer:0:1}
 Min=${curVer:2:1}
 Rel=${curVer:4:1}
 
 
-echo "Starting values for numbers Maj Min Rel: ${Maj} ${Min} ${Rel}"
+#echo "Starting values for numbers Maj Min Rel: ${Maj} ${Min} ${Rel}"
 
 function _incrVersion () { # Base 10 version counter
 
@@ -60,7 +59,7 @@ function _incrVersion () { # Base 10 version counter
 
 nextVer=$(_incrVersion $Maj $Min $Rel)
 
-echo "Next version is: ${nextVer}"
+echo "Staging deployment of next version: ${nextVer}"
 
 
 
@@ -79,8 +78,6 @@ docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && mvn clean t
 # cd /root/images/doci-app && docker build -t doci-app .
 
 R=$autoScale
-
-R=3; 
 
 while [ "$R" -ne 0 ]; 
 do 
@@ -121,7 +118,7 @@ do
 done 
 
 
-# 4. update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
+# 4. NGINX - update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
 
 R=$autoScale
 while [ "$R" -ne 0 ]; 
@@ -136,7 +133,6 @@ do
 	R=$[R-1]; 
 done
 
-
 # 4.1 generate new doci-lbal image 
 
 cd ./doci-lbal && docker build -t doci-lbal:${nextVer} . || rc=$?; 
@@ -146,7 +142,6 @@ cd ./doci-lbal && docker build -t doci-lbal:${nextVer} . || rc=$?;
 		echo Failed to generate new doci-lbal image (4.1)
 		exit -4;
 	fi 
-
 
 # 4.2 start container for ngnx load balancer in CD
 
@@ -162,7 +157,16 @@ docker run -d --name nginx doci-lbal:${nextVer} || rc=$?;
 		exit;
 	fi 
 
-# 5. generate doci-db image IS NOT part of script CD
+
+# 5. MARIADB - generate doci-db image IS NOT part of script CD, but needed for version sync
+
+cd ./doci-db && docker build -t doci-db:${nextVer} . || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: terminate script 
+		echo Failed to generate new doci-db image (5)
+		exit -5;
+	fi 
 
 docker container rename mariadb-${curVer}; 
 docker stop mariadb-${curVer};
