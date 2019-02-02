@@ -1,0 +1,7 @@
+version: '2'
+services:
+  devops:
+    build: .
+    image: rauccapuclla/devops-docker
+    ports:
+      - 8080:8080
