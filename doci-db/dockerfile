@@ -1,0 +1,18 @@
+######################################################## 
+# Dockerfile for doci-db database container with MariaDB
+######################################################## 
+# Build from base image doci-base:latest 
+FROM doci-base:latest 
+# Author: Sean Peterson 
+
+MAINTAINER Sean Peterson <sean729@gmail.com> 
+
+RUN \
+	export DEBIAN_FRONTEND=noninteractive && \
+	debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password password PASS' && \
+	debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password_again password PASS'
+
+RUN \
+	apt-get update && \
+	apt-get install -y software-properties-common jq mariadb-server mariadb-client
+

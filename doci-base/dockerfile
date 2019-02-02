@@ -1,0 +1,12 @@
+######################################################## 
+# Dockerfile for doci-base
+######################################################## 
+# Build from base image ubuntu:latest 
+FROM ubuntu:latest 
+# Author: Sean Peterson 
+MAINTAINER Sean` Peterson <sean729@gmail.com> 
+# Set command for RUN 
+RUN \
+	apt-get update && \
+	apt-get install -y software-properties-common jq 
+

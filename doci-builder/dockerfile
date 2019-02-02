@@ -1,0 +1,29 @@
+######################################################## 
+# Dockerfile for doci-builder
+######################################################## 
+# Build from base doci image adding Java 1.8, Spring Boot, Maven (+11MB)
+
+FROM doci-app:latest 
+# Author: Sean Peterson 
+# Version: 0.0.1
+
+MAINTAINER Sean Peterson <sean729@gmail.com> 
+
+RUN \
+	add-apt-repository -y ppa:webupd8team/java && \
+	echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
+	apt-get update && \
+	apt-get install -y oracle-java8-installer maven git docker-compose docker
+
+RUN \
+	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN \
+	mkdir -p /home/rauccapu/maven/repo && \
+	cd /home/rauccapu/maven/repo
+
+RUN \
+	git clone https://github.com/rauccapuclla/devops-docker.git
+	
+ENV JAVA_HOME /usr/lib/jvm/java-8-oracle
+
