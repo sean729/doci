@@ -39,10 +39,10 @@ echo "Starting values for numbers Maj Min Rel: ${Maj} ${Min} ${Rel}"
 
 function _incrVersion () { # Base 10 version counter
 
-	if [[ "${3}" == 9 ]];
-	then nRel="0"
-		if [[ "${2}" == 9 ]];
-		then nMin="0"
+	if [[ "${3}" == 9 ]]; then 
+		nRel="0"
+		if [[ "${2}" == 9 ]]; then 
+			nMin="0"
 			nMaj=$[$1+1]
 		else nMin=$[$2+1]
 			nMaj=$1
@@ -79,7 +79,28 @@ docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && mvn clean t
 # cd /root/images/doci-app && docker build -t doci-app .
 
 R=$autoScale
-R=3; while [ "$R" -ne 0 ]; do docker run -d --name sprboot$R doci-app:${nextVer}; R=$[R-1]; done
+
+R=3; 
+
+while [ "$R" -ne 0 ]; 
+do 
+	docker stop sprboot$R || exit -1;
+	docker container rename sprboot${R} sprboot$[R}-${curVer}; 
+	docker run -d --name sprboot$R doci-app:${nextVer} || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: restart last version 
+		O=$autoScale; 
+		while [ "$O" -ne 0 ]; 
+		do
+			docker container stop sprboot${O}
+			docker container start sprboot${O}-${curVer};
+			O=$[O-1]; 
+		done
+		exit -3;
+	fi 
+	R=$[R-1]; 
+done
 
 # 3.1 get IP address of each sprboot container and update load balance config file (nginx)
 
@@ -96,24 +117,56 @@ done
 R=$autoScale
 while [ "$R" -ne 0 ]; 
 do
-	sed -i "s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf
+	sed -i "s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: terminate script 
+		echo Unable to update nginx config for load balancing
+		exit;
+	fi 
+	R=$[R-1]; 
 done
 
 
-# 4.1 generate new doci-lbal image and upload to 
+# 4.1 generate new doci-lbal image 
 
-cd ./doci-lbal && docker build -t doci-lbal:${nextVer} .
-docker tag doci-lbal:${nextVer} sean729/doci-lbal:${nextVer}
-docker push sean729/doci-lbal:${nextVer}
+cd ./doci-lbal && docker build -t doci-lbal:${nextVer} . || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: terminate script 
+		echo Failed to generate new doci-lbal image (4.1)
+		exit -4;
+	fi 
+
 
 # 4.2 start container for ngnx load balancer in CD
 
-docker run -d --name nginx doci-lbal:${nextVer}
+docker container rename nginx-${curVer}; 
+docker stop nginx-${curVer};
 
+docker run -d --name nginx doci-lbal:${nextVer} || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: 
+		echo restarted previous version load balancer nginx-${curVer}
+		docker container start nginx-${curVer};
+		exit;
+	fi 
 
 # 5. generate doci-db image IS NOT part of script CD
-docker run -d --name mariadb doci-db:latest
 
+docker container rename mariadb-${curVer}; 
+docker stop mariadb-${curVer};
+
+docker run -d --name mariadb doci-db:${nextVer} || rc=$?; 
+
+	if [[ ${rc} -ne 0 ]]; then
+		# roll-back step: 
+		echo restarting previous version mariadb-${curVer}
+		docker container start mariadb-${curVer};
+		exit;
+	fi
+	
 
 # 6. final state updates
 
