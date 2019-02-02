@@ -9,14 +9,14 @@ FROM doci-base:latest
 
 MAINTAINER Sean Peterson <sean729@gmail.com> 
 
-#RUN echo exit 0 > /usr/sbin/policy-rc.d && \
-#	apt-get update && \
-#	apt-get install -y nginx
+RUN echo exit 0 > /usr/sbin/policy-rc.d && \
+	apt-get update && \
+	apt-get install -y nginx
 
 
 COPY \
 	default-nginx.conf /etc/nginx/sites-available/default
 	
-	
+# Do not restart at this time
 #RUN \
 #	service nginx restart
