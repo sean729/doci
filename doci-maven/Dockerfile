@@ -4,10 +4,9 @@ FROM doci-base:latest
 
 RUN \
   echo exit 0 > /usr/sbin/policy-rc.d && \
-  apt-get update && \
-  mkdir /usr/lib/mvn
+  apt-get update
 
-RUN apt-get install -y ca-certificates git openjdk-8-jre wget    && \
+RUN apt-get install -y ca-certificates git openjdk-8-jdk wget    && \
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
   find /usr/share/ca-certificates/mozilla/ -name "*.crt" -exec keytool -import -trustcacerts \
   -keystore /etc/ssl/certs/java/cacerts -storepass changeit -noprompt \
