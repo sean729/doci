@@ -112,6 +112,11 @@ R=$autoScale
 while [ "$R" -ne 0 ]; 
 do 
 	export "IPA$R"=$(docker container inspect "sprboot$R" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
+	if [[ $IPA$R -eq null ]]; then 
+		# roll-back step: terminate script 
+		echo Halted deployment at step 3.1 - Failed to obtain IP address of container sprboot$R; 
+		exit -1; 
+	fi
 	R=$[R-1]; 
 done 
 
@@ -121,11 +126,11 @@ done
 R=$autoScale
 while [ "$R" -ne 0 ]; 
 do
-	sed -i "s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf || rc=$?; 
+	sed -i "/sprboot$R/!{q10}; s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf || rc=$?; 
 
 	if [[ ${rc} -ne 0 ]]; then
 		# roll-back step: terminate script 
-		echo Unable to update nginx config for load balancing
+		echo Halted deployment at step 4 - Unable to update nginx config for load balancing
 		exit;
 	fi 
 	R=$[R-1]; 
