@@ -19,9 +19,13 @@ set -o errexit
 # VARIABLES
 
 nameImage="doci-app" # SAMPLE doci-app:1.0.0
+
+docker pull sean729/$nameImage:latest 
+
 verImage=$(docker image inspect $nameImage:latest | jq .[0] | jq .RepoTags[0] | sed "s/\"//g")
 lenImage=${#verImage}
 curVer=${verImage:$[lenImage-5]:$lenImage}
+
 echo "Image current version tag is: ${curVer}"
 
 
