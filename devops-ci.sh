@@ -87,13 +87,13 @@ IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.doci_default.IP
 
 
 # 4. update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
-sed -i "s/sprboot1/$IPA1/" /root/images/doci-lbal/default-nginx.conf
-sed -i "s/sprboot2/$IPA2/" /root/images/doci-lbal/default-nginx.conf
-sed -i "s/sprboot3/$IPA3/" /root/images/doci-lbal/default-nginx.conf
+sed -i "s/sprboot1/$IPA1/" ./doci-lbal/default-nginx.conf
+sed -i "s/sprboot2/$IPA2/" ./doci-lbal/default-nginx.conf
+sed -i "s/sprboot3/$IPA3/" ./doci-lbal/default-nginx.conf
 
 
 # 4.1 New image doci-lbal and start container for ngnx load balancer in CD
-cd /root/images/doci-lbal && docker build -t doci-lbal:${nextVer} .
+cd ./doci-lbal && docker build -t doci-lbal:${nextVer} .
 docker run -d --name nginx doci-lbal:latest
 
 
