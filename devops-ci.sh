@@ -18,8 +18,16 @@ set -o errexit
 
 # VARIABLES
 
-#Ver="1.9.8" #SAMPLE CONTENT
-idImage="de37a71fba71" # SAMPLE ID (tag atlassian/bamboo-server:6.7.1)
+nameImage="doci-app" # SAMPLE doci-app:1.0.0
+verImage=$(docker image inspect $nameImage:latest | jq .[0] | jq .RepoTags[0] | sed "s/\"//g")
+lenImage=${#verImage}
+curVer=${verImage:$[lenImage-5]:$lenImage}
+echo "Image current version tag is: ${curVer}"
+
+
+Maj=${curVer:0:1}
+Min=${curVer:2:1}
+Rel=${curVer:4:1}
 
 
 echo "Starting values for numbers Maj Min Rel: ${Maj} ${Min} ${Rel}"
@@ -44,19 +52,10 @@ function _incrVersion () { # Base 10 version counter
 
 }
 
-#PARSE VERSION NO OF IMAGE $idImage
-strImage=$(docker image inspect $idImage | jq .[0] | jq .RepoTags[0] | sed "s/\"//g")
-lenImage=${#strImage}
-echo "Image current version tag: ${strImage:$[lenImage-5]:$lenImage}"
-
-Ver=${strImage:$[lenImage-5]:$lenImage}
-Maj=${Ver:0:1}
-Min=${Ver:2:1}
-Rel=${Ver:4:1}
 
 nextVer=$(_incrVersion $Maj $Min $Rel)
 
-echo "New content of Ver is: ${Ver}"
+echo "Next version is: ${nextVer}"
 
 
 
@@ -70,12 +69,12 @@ docker run -d --name maven doci-builder:latest
 docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && git pull origin master'
 docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && mvn clean test && mvn clean package && mvn '
 
-# 3. run doci-app containers (java 1.8, springboot) for CD
+# 3. run containers based on image doci-app (java 1.8, springboot) for CD
 # cd /root/images/doci-app && docker build -t doci-app .
 
-docker run -d --name sprboot1 doci-builder:latest
-docker run -d --name sprboot2 doci-builder:latest
-docker run -d --name sprboot3 doci-builder:latest
+docker run -d --name sprboot1 doci-app:latest
+docker run -d --name sprboot2 doci-app:latest
+docker run -d --name sprboot3 doci-app:latest
 
 # 3.1 get each IP address
 IPA1=(docker inspect sprboot1 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
@@ -83,14 +82,14 @@ IPA2=(docker inspect sprboot2 | jq .[0].NetworkSettings.Networks.devopsdocker_de
 IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
 
 
-#3.2 update the /root/images/doci-lbal/hosts-apptier.conf
-sed -i "s/^.*sprboot1/$IPA1\t\tsprboot1/" /root/images/doci-lbal/hosts-apptier.conf
-sed -i "s/^.*sprboot2/$IPA2\t\tsprboot2/" /root/images/doci-lbal/hosts-apptier.conf
-sed -i "s/^.*sprboot3/$IPA3\t\tsprboot3/" /root/images/doci-lbal/hosts-apptier.conf
+# 4. update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
+sed -i "s/sprboot1/$IPA1/" /root/images/doci-lbal/default-nginx.conf
+sed -i "s/sprboot2/$IPA2/" /root/images/doci-lbal/default-nginx.conf
+sed -i "s/sprboot3/$IPA3/" /root/images/doci-lbal/default-nginx.conf
 
 
-# 4. New image doci-lbal and start container for ngnx load balancer in CD
-cd /root/images/doci-lbal && docker build -t doci-lbal .
+# 4.1 New image doci-lbal and start container for ngnx load balancer in CD
+cd /root/images/doci-lbal && docker build -t doci-lbal:${nextVer} .
 docker run -d --name nginx doci-lbal:latest
 
 
