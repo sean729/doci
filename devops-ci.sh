@@ -95,7 +95,11 @@ do
 		do
 			docker container stop sprboot${O}
 			docker container start sprboot${O}-${curVer};
-			O=$[O-1]; 
+			if [[ "$O" == "$R" ]]; then
+				O="0"
+			else 
+				O=$[O-1];
+			fi
 		done
 		exit -3;
 	fi 
