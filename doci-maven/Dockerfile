@@ -20,8 +20,7 @@ ENV PATH $MAVEN_HOME/bin:$PATH
 RUN wget http://archive.apache.org/dist/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz && \
   tar -zxvf apache-maven-$MAVEN_VERSION-bin.tar.gz && \
   rm apache-maven-$MAVEN_VERSION-bin.tar.gz   && \
-  mv apache-maven-$MAVEN_VERSION /usr/lib/mvn && \
-  ls -l /usr/lib/mvn
+  mv apache-maven-$MAVEN_VERSION /usr/lib/mvn
   
 RUN git config --global user.email "sean729@gmail.com"
 RUN git config --global user.name "Sean Peterson"

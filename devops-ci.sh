@@ -81,9 +81,9 @@ R=$autoScale
 
 while [ "$R" -ne 0 ]; 
 do 
-	docker stop sprboot$R || exit -1;
+	docker stop sprboot${R} || exit -1;
 	docker container rename sprboot${R} sprboot$[R}-${curVer}; 
-	docker run -d --name sprboot$R doci-app:${nextVer} || rc=$?; 
+	docker run -d --name sprboot${R} doci-app:${nextVer} || rc=$?; 
 
 	if [[ ${rc} -ne 0 ]]; then
 		# roll-back step: restart last version 
@@ -108,10 +108,10 @@ done
 R=$autoScale
 while [ "$R" -ne 0 ]; 
 do 
-	export "IPA$R"=$(docker container inspect "sprboot$R" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
+	export "IPA$R"=$(docker container inspect "sprboot${R}" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
 	if [[ $IPA$R -eq null ]]; then 
 		# roll-back step: terminate script 
-		echo Halted deployment at step 3.1 - Failed to obtain IP address of container sprboot$R; 
+		echo Halted deployment at step 3.1 - Failed to obtain IP address of container sprboot${R}; 
 		exit -1; 
 	fi
 	R=$[R-1]; 

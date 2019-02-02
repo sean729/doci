@@ -1,7 +1,6 @@
 version: '2'
 services:
-  devops:
+  app:
     build: .
-    image: rauccapuclla/devops-docker
-    ports:
-      - 8080:8080
+    image: doci-app:1.0.2
+
