@@ -82,16 +82,15 @@ IPA1=(docker inspect sprboot1 | jq .[0].NetworkSettings.Networks.devopsdocker_de
 IPA2=(docker inspect sprboot2 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
 IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
 
-#IPA1="192.168.1.1"
-#IPA2="192.168.1.2"
-#IPA3="192.168.1.3"
 
 #3.2 update the /root/images/doci-lbal/hosts-apptier.conf
 sed -i "s/^.*sprboot1/$IPA1\t\tsprboot1/" /root/images/doci-lbal/hosts-apptier.conf
 sed -i "s/^.*sprboot2/$IPA2\t\tsprboot2/" /root/images/doci-lbal/hosts-apptier.conf
 sed -i "s/^.*sprboot3/$IPA3\t\tsprboot3/" /root/images/doci-lbal/hosts-apptier.conf
 
-# 4. start doci-lbal container for ngnx load balancer in CD
+
+# 4. New image doci-lbal and start container for ngnx load balancer in CD
+cd /root/images/doci-lbal && docker build -t doci-lbal .
 docker run -d --name nginx doci-lbal:latest
 
 
