@@ -21,7 +21,7 @@ cd /root/images/doci-builder && docker build -t doci-builder .
 
 
 # 3. generate doci-app image (java 1.8, Maven/springboot) IS part of script CD pipeline
-cd /root/images/doci-app && docker build -t doci-app .
+cd /root/images/doci-app && docker build -t doci-app:1.0.1 .
 
 
 # 4. generate doci-lbal image for ngnx load balancer IS NOT part of script CD pipeline
@@ -29,4 +29,4 @@ cd /root/images/doci-lbal && docker build -t doci-lbal .
 
 
 # 5. generate doci-db image IS NOT part of script CD pipeline
-cd /root/images/doci-db && docker build -t doci-db .
+cd /root/images/doci-db && docker build -t doci-db:latest .

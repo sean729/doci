@@ -81,9 +81,9 @@ docker run -d --name sprboot2 doci-app:latest
 docker run -d --name sprboot3 doci-app:latest
 
 # 3.1 get each IP address
-IPA1=(docker inspect sprboot1 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
-IPA2=(docker inspect sprboot2 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
-IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.devopsdocker_default.IPAddress | sed "s/\"//g")
+IPA1=(docker inspect sprboot1 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
+IPA2=(docker inspect sprboot2 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
+IPA3=(docker inspect sprboot3 | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g")
 
 
 # 4. update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
