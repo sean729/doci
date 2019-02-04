@@ -21,7 +21,7 @@ set -o errexit
 
 nameImage="doci-app" # SAMPLE doci-app:1.0.0
 autoScale="3"
-docker pull sean729/$nameImage:latest 
+#docker pull sean729/$nameImage:latest 
 
 verImage=$(docker image inspect $nameImage:latest | jq .[0] | jq .RepoTags[0] | sed "s/\"//g")
 lenImage=${#verImage}
@@ -66,74 +66,80 @@ echo "Staging deployment of next version: ${nextVer}"
 # 1. generate doci-base image shall be commented out, not part of script CD
 
 
-# 2. start container with doci-builder image to generate new doci-app image for Ci/CD
+echo 2. start building image doci-app via maven container for CI/CD
+docker-compose -f docker-ci.yml run --rm maven clean test || exit -1
+echo 2.1 Completed Maven test
 
-#start container for CI, call/trigger Maven script to build Spring app (docker in docker??) 
-docker run -d --name maven doci-builder:latest
-docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && git pull origin master'
-docker exec -it maven 'cd /home/rauccapu/maven/repo/devops-docker && mvn clean test && mvn clean package && mvn '
+docker-compose -f docker-ci.yml run --rm maven clean package || exit -1
+echo 2.2 Completed compiling Maven package
+
+docker-compose build || exit -1
+echo 2.3 Successfuly built image doci-app latest
+
+docker image tag doci-app:latest doci-app:${newVer}
+echo 2.4 Tagged doci-app (${newVer})
+
+docker-compose down 
+echo 2.5 Stopped containers based on doci-app version ${curVer}
 
 
-# 3. run containers based on image doci-app (java 1.8, springboot) for CD
-# cd /root/images/doci-app && docker build -t doci-app .
+# manage old containers
 
 R=$autoScale
 
 while [ "$R" -ne 0 ]; 
 do 
-	docker stop sprboot$R || exit -1;
-	docker container rename sprboot${R} sprboot$[R}-${curVer}; 
-	docker run -d --name sprboot$R doci-app:${nextVer} || rc=$?; 
-
-	if [[ ${rc} -ne 0 ]]; then
-		# roll-back step: restart last version 
-		O=$autoScale; 
-		while [ "$O" -ne 0 ]; 
-		do
-			docker container stop sprboot${O}
-			docker container start sprboot${O}-${curVer};
-			if [[ "$O" == "$R" ]]; then
-				O="0"
-			else 
-				O=$[O-1];
-			fi
-		done
-		exit -3;
-	fi 
+	docker container rename doci_app_${R} doci_app_$[R}-${curVer}; 
 	R=$[R-1]; 
 done
 
-# 3.1 get IP address of each sprboot container and update load balance config file (nginx)
+echo 3. run containers based on image doci-app for CD
+docker-compose up -d  || Failure=1
+
+echo 3.1 Scaling up doci_app version ${newVer} to $autoScale containers
+docker-compose scale app=3
+
+echo 3.1 get IP address of each sprboot container and update load balance config file (nginx)
 
 R=$autoScale
 while [ "$R" -ne 0 ]; 
 do 
-	export "IPA$R"=$(docker container inspect "sprboot$R" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
+	export "IPA$R"=$(docker container inspect "doci_app_${R}" | jq .[0].NetworkSettings.Networks.doci_default.IPAddress | sed "s/\"//g"); 
 	if [[ $IPA$R -eq null ]]; then 
 		# roll-back step: terminate script 
-		echo Halted deployment at step 3.1 - Failed to obtain IP address of container sprboot$R; 
-		exit -1; 
+		echo Rolling back deployment at step 3.1 - Failed to obtain IP address of container doci_app_${R}; 
+		Failure=1; 
+	else 
+		test=0
+		test=$(curl http://$IPA$R:8080/)
+		if [[ $test -ne "Aplicación de laboratorio v2" ]]; then 
+			Failure=1
+		fi
 	fi
-	R=$[R-1]; 
-done 
-
-
-# 4. NGINX - update the IP Addresses in /root/images/doci-lbal/hosts-apptier.conf
-
-R=$autoScale
-while [ "$R" -ne 0 ]; 
-do
+	echo update the IP $IPA$R in /root/images/doci-lbal/hosts-apptier.conf
 	sed -i "/sprboot$R/!{q10}; s/sprboot$R/$IPA$R/" ./doci-lbal/default-nginx.conf || rc=$?; 
 
 	if [[ ${rc} -ne 0 ]]; then
 		# roll-back step: terminate script 
-		echo Halted deployment at step 4 - Unable to update nginx config for load balancing
-		exit;
+		echo Halted deployment at step 3 - Unable to update nginx config for load balancing
+		Failure=1;
 	fi 
 	R=$[R-1]; 
-done
+done 
 
-# 4.1 generate new doci-lbal image 
+if [[ $Failure -eq 1 ]]; then 
+	docker-compose down 
+	docker image tag doci-app:${curVer} doci-app:latest 
+	docker-compose up -d 
+	echo Rolled back at section 3 and halted further deployment.
+	exit -3
+fi
+
+
+echo 4. NGINX - 
+
+
+echo 4.1 generate new doci-lbal image 
 
 cd ./doci-lbal && docker build -t doci-lbal:${nextVer} . || rc=$?; 
 
@@ -143,7 +149,7 @@ cd ./doci-lbal && docker build -t doci-lbal:${nextVer} . || rc=$?;
 		exit -4;
 	fi 
 
-# 4.2 start container for ngnx load balancer in CD
+echo 4.2 start container for ngnx load balancer in CD
 
 docker container rename nginx-${curVer}; 
 docker stop nginx-${curVer};
@@ -152,13 +158,13 @@ docker run -d --name nginx doci-lbal:${nextVer} || rc=$?;
 
 	if [[ ${rc} -ne 0 ]]; then
 		# roll-back step: 
-		echo restarted previous version load balancer nginx-${curVer}
+		echo Rolling back and restarting previous version load balancer nginx-${curVer}
 		docker container start nginx-${curVer};
 		exit;
 	fi 
 
 
-# 5. MARIADB - generate doci-db image IS NOT part of script CD, but needed for version sync
+echo 5. MARIADB - generate doci-db image IS NOT part of script CD, but needed for version sync
 
 cd ./doci-db && docker build -t doci-db:${nextVer} . || rc=$?; 
 
@@ -181,23 +187,23 @@ docker run -d --name mariadb doci-db:${nextVer} || rc=$?;
 	fi
 	
 
-# 6. final state updates
+echo 6. final state updates
 
-# 6.1 upload new doci-app image to Docker Hub account
+echo 6.1 upload new doci-app image to Docker Hub account
 
 docker tag doci-app:${nextVer} sean729/doci-app:${nextVer}
 docker push sean729/doci-app:${nextVer}
 docker tag doci-app:latest sean729/doci-app:latest
 docker push sean729/doci-app:latest
 
-# 6.2 upload new doci-lbal image to Docker Hub account
+echo 6.2 upload new doci-lbal image to Docker Hub account
 
 docker tag doci-lbal:${nextVer} sean729/doci-lbal:${nextVer}
 docker push sean729/doci-lbal:${nextVer}
 docker tag doci-lbal:latest sean729/doci-lbal:latest
 docker push sean729/doci-lbal:latest
 
-# 6.3 upload new doci-db image to Docker Hub account
+echo 6.3 upload new doci-db image to Docker Hub account
 
 docker tag doci-db:${nextVer} sean729/doci-db:${nextVer}
 docker push sean729/doci-db:${nextVer}

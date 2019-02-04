@@ -1,12 +1,13 @@
 ######################################################## 
 # Dockerfile for doci-base
 ######################################################## 
-# Build from base image ubuntu:latest 
-FROM ubuntu:latest 
+# Build from base image harisekhon/ubuntu-java:latest 
+FROM harisekhon/ubuntu-java:latest 
+
 # Author: Sean Peterson 
-MAINTAINER Sean` Peterson <sean729@gmail.com> 
-# Set command for RUN 
+MAINTAINER Sean Peterson <sean729@gmail.com> 
+ 
 RUN \
 	apt-get update && \
-	apt-get install -y software-properties-common jq 
-
+	apt-get install -y jq && \
+	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 

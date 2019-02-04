@@ -1,0 +1,10 @@
+version: '2'
+services:
+  maven:
+    image: doci-maven:1.0.3
+    volumes:
+      - .:/usr/src/app
+      - mavenrepo:/root/.m2
+volumes:
+  mavenrepo:
+    external: true 
