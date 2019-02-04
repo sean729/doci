@@ -2,21 +2,23 @@
 # Dockerfile for doci-lbal nginx
 ######################################################## 
 # Build from base image doci-base:latest for load balancer using nginx (+22 MB)
-FROM doci-base:latest 
+FROM doci-base:1.0.3 
 
 # Author: Sean Peterson 
 # Version: 0.0.5
 
 MAINTAINER Sean Peterson <sean729@gmail.com> 
 
+
 RUN echo exit 0 > /usr/sbin/policy-rc.d && \
 	apt-get update && \
-	apt-get install -y nginx
+	apt-get install -y nginx && \
+	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 
 
 
 COPY \
 	default-nginx.conf /etc/nginx/sites-available/default
 	
-# Do not restart at this time
-#RUN \
-#	service nginx restart
+
+RUN \
+	service nginx restart
